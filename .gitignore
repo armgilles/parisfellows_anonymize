@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 
 /data
-DS_Store
+.DS_Store
 xgb.fmap
 *.pnj
 
