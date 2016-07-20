@@ -146,12 +146,12 @@ if DUMMY == True:
 
 # Split data to get an unknow dataset (valide): 
 X_trainning, X_valide, y_trainning, y_valide = train_test_split(X, y, stratify=y, 
-                                                                   test_size=0.20, random_state=2016)
+                                                                   test_size=0.20, random_state=15)
                                                                    
 
 # Split data to get X_train / X_test :
 X_train, X_test, y_train, y_test = train_test_split(X_trainning, y_trainning, stratify=y_trainning, 
-                                                                   test_size=0.33, random_state=2016)
+                                                                   test_size=0.33, random_state=16)
 
 
 dtrain = xgb.DMatrix(X_train, y_train, missing=-1)
@@ -160,11 +160,11 @@ evallist = [(dtrain, 'train'), (dtest, 'test')]
 
 params = {'max_depth':7,#12,
          'eta':0.015,#0.01,
-         'subsample':0.65,#0.8,
-         #'colsample_bytree':0.54,#0.7,
+         'subsample':0.8,#0.8,
+         'colsample_bytree':0.8,#0.7,
          'silent':1,
-         'scale_pos_weight' : ratio,
-        # 'min_child_weight': 6.14,
+#         'scale_pos_weight' : ratio,
+#         'min_child_weight': 6,
         # 'max_delta_step': 0.086,
          'objective':'binary:logistic',
          'nthread':8,
@@ -193,5 +193,15 @@ X_valide = X_valide.join(doc_name_save)
 X_valide = X_valide.join(paragraph_nb_save)
 X_valide['is_target'] = y_valide
 X_valide['y_pred'] = y_pred_valide_b
+X_valide['y_pred'] = y_pred_valide
 X_valide['error'] =0
 X_valide.loc[X_valide['is_target'] != X_valide['y_pred'], 'error'] = 1
+
+print "_"*54
+print "Some metrics : "
+get_metric(y_valide, y_pred_valide_b)
+
+print "_"*54
+print "Confusion matrix : "
+cm = confusion_matrix(y_valide, y_pred_valide_b)
+print cm
