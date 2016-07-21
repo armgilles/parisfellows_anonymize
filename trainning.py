@@ -127,11 +127,12 @@ def xg_f1(yhat, y):
          
 data = pd.read_csv('data/data.csv', encoding='utf-8')#, dtype=dtype)
 
-useful_col = [col for col in data.columns if col not in ['word', 'doc_name', 'paragraph_nb']]
+useful_col = [col for col in data.columns if col not in ['word', 'doc_name', 'paragraph_nb', 'firstname_is_french']]
 
 word_save = data['word']
 doc_name_save = data['doc_name']
 paragraph_nb_save = data['paragraph_nb']
+firstname_is_french_save = data['firstname_is_french']
 
 data = data[useful_col]
 y = data['is_target']
@@ -191,6 +192,7 @@ print "RECALL on unknow dataset: "+ str(auc_valide)
 X_valide = X_valide.join(word_save)
 X_valide = X_valide.join(doc_name_save)
 X_valide = X_valide.join(paragraph_nb_save)
+X_valide = X_valide.join(firstname_is_french_save)
 X_valide['is_target'] = y_valide
 X_valide['y_pred'] = y_pred_valide_b
 X_valide['y_pred_proba'] = y_pred_valide
