@@ -33,11 +33,11 @@ target_dict = {u'X\xe2\x80\xa6' : 'X', u'X' : 'X', u'X..' : 'X', u'X.' : 'X',
 #################################################
 
 
-def get_target_name(sentence):
-    for i in range(len(sentence.split(' '))):
-        w = sentence.split(' ')[i].replace(',', '').replace('.', '')
-        if w in target_list:
-            return target_dict.keys.index(w)
+#def get_target_name(sentence):
+#    for i in range(len(sentence.split(' '))):
+#        w = sentence.split(' ')[i].replace(',', '').replace('.', '')
+#        if w in target_list:
+#            return target_dict.keys.index(w)
 
 
 def get_target(sentence):
@@ -124,12 +124,15 @@ word_df = pd.concat([word_df, context_df], axis=1)
 # Reading firstnames file
 firstname_df = pd.read_csv('data/prenom_clean.csv', encoding='utf-8', 
                            header=None, names = ["firstname"])
+# Use Majuscule in first carac                           
+firstname_df['firstname'] = firstname_df['firstname'].apply(lambda x: x.title())                           
 firstname_list = firstname_df.firstname.tolist()
 
 
 word_df['is_target'] = word_df['word'].apply(lambda x: 1 if x in target_dict.keys() else 0)
 word_df['is_stopword'] = word_df['word'].apply(lambda x: 1 if x.lower() in stopword_fr else 0)
 word_df['is_first_char_upper'] = word_df['word'].apply(lambda x: 1 if x[0].isupper() else 0)
+word_df['is_upper'] = word_df['word'].apply(lambda x: 1 if x.isupper() else 0)
 word_df['is_firstname'] = word_df['word'].apply(lambda x: 1 if x.lower() in firstname_list  else 0)
 
 # to have granularite
@@ -169,6 +172,8 @@ def get_random_firstname(x):
     
 # To delete after
 word_df.loc[word_df['is_target'] ==1, 'word'] = word_df['word'].apply(lambda x: get_random_firstname(x))
+word_df.loc[word_df['is_target'] ==1, 'is_firstname'] = random.randint(0, 1)    #1 is To strong rule so random
+word_df['len_word'] = word_df['word'].apply(lambda x: len(x))  # len
 
 # Label encoding word
 lbl = LabelEncoder()

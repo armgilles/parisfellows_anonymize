@@ -146,24 +146,24 @@ if DUMMY == True:
 
 # Split data to get an unknow dataset (valide): 
 X_trainning, X_valide, y_trainning, y_valide = train_test_split(X, y, stratify=y, 
-                                                                   test_size=0.20, random_state=15)
+                                                                   test_size=0.20, random_state=20)
                                                                    
 
 # Split data to get X_train / X_test :
 X_train, X_test, y_train, y_test = train_test_split(X_trainning, y_trainning, stratify=y_trainning, 
-                                                                   test_size=0.33, random_state=16)
+                                                                   test_size=0.33, random_state=21)
 
 
 dtrain = xgb.DMatrix(X_train, y_train, missing=-1)
 dtest = xgb.DMatrix(X_test, y_test, missing=-1)
 evallist = [(dtrain, 'train'), (dtest, 'test')]
 
-params = {'max_depth':7,#12,
-         'eta':0.015,#0.01,
-         'subsample':0.8,#0.8,
-         'colsample_bytree':0.8,#0.7,
+params = {'max_depth':6,#12,
+         'eta':0.1,#0.01,
+#         'subsample':0.85,#0.8,
+#         'colsample_bytree':0.95,#0.7,
          'silent':1,
-#         'scale_pos_weight' : ratio,
+         'scale_pos_weight' : ratio,
 #         'min_child_weight': 6,
         # 'max_delta_step': 0.086,
          'objective':'binary:logistic',
@@ -173,7 +173,7 @@ params = {'max_depth':7,#12,
 num_round = 400         
 
 bst = xgb.train(params, dtrain, num_round, evallist, early_stopping_rounds=25,
-                feval=recall, maximize=True)
+                feval=xg_f1, maximize=True)
 
 # Validation on X_test
 y_pred = bst.predict(xgb.DMatrix(X_test), ntree_limit=bst.best_ntree_limit)
@@ -193,7 +193,7 @@ X_valide = X_valide.join(doc_name_save)
 X_valide = X_valide.join(paragraph_nb_save)
 X_valide['is_target'] = y_valide
 X_valide['y_pred'] = y_pred_valide_b
-X_valide['y_pred'] = y_pred_valide
+X_valide['y_pred_proba'] = y_pred_valide
 X_valide['error'] =0
 X_valide.loc[X_valide['is_target'] != X_valide['y_pred'], 'error'] = 1
 
