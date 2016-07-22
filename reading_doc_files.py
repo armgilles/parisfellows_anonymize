@@ -25,6 +25,8 @@ target_dict = {u'X\xe2\x80\xa6' : 'X', u'X' : 'X', u'X..' : 'X', u'X.' : 'X',
                u'Y\u2026' : 'Y', u'M.Y' : 'Y', u'M.Y\u2026' : 'Y',
                u'Z\xe2\x80\xa6': 'Z', u'Z' : 'Z', u'Z..' : 'Z', u'Z.' : 'Z', 
                u'Z\u2026' : 'Z', u'M.Z' : 'Z', u'M.Z\u2026' : 'Z'}
+               
+mister_list = [u'M', u'M.', u'Madame', u'Mme', u'Monsieur', u'Dr', u'Monsieur']
 
 #punctuations = '''!()-[]{};:'"\,<>./?@#$%^&*_~'''
 
@@ -121,7 +123,7 @@ context_df = pd.DataFrame(context_word)
 # Merging context & bad of word
 word_df = pd.concat([word_df, context_df], axis=1)
 
-# Reading firstnames file
+# Reading French's firstnames file
 firstname_df = pd.read_csv('data/prenom_clean.csv', encoding='utf-8', 
                            header=None, names = ["firstname"])
 # Use Majuscule in first carac                           
@@ -129,11 +131,13 @@ firstname_df['firstname'] = firstname_df['firstname'].apply(lambda x: x.title())
 firstname_list = firstname_df.firstname.tolist()
 
 
+# Reading foreign's firstnames file
+foreign_firstname_df =  pd.read_csv('data/foreign_fistname_clean.csv', encoding='utf-8',
+                             header=None, names = ["firstname"])
+foreign_firstname_list = foreign_firstname_df.firstname.tolist()
+
+
 word_df['is_target'] = word_df['word'].apply(lambda x: 1 if x in target_dict.keys() else 0)
-word_df['is_stopword'] = word_df['word'].apply(lambda x: 1 if x.lower() in stopword_fr else 0)
-word_df['is_first_char_upper'] = word_df['word'].apply(lambda x: 1 if x[0].isupper() else 0)
-word_df['is_upper'] = word_df['word'].apply(lambda x: 1 if x.isupper() else 0)
-word_df['is_firstname'] = word_df['word'].apply(lambda x: 1 if x.lower() in firstname_list  else 0)
 
 # to have granularite
 word_df['temp_count'] = 1 
@@ -164,16 +168,61 @@ word_df = word_df.drop(['temp_count', 'end_comma', 'end_comma_cum',
                        'end_point', 'end_point_cum'], axis=1)
 
 
-# Insert random first name in place of 'X', Mr 'X...' ...
+## Insert random first name in place of 'X', Mr 'X...' ...
+# 
+
 # /!\ Delete when true data
 def get_random_firstname(x):
-    random_idx = random.randint(0, 2046) # len de firstname_list
-    return firstname_list[random_idx]
+    """
+    Use a first random (0/1) to chose between French's firstname or foreign
+    And a random firstname in the random chosen dataset
+    """
+    # first random to chose the dataset
+    first_random = random.randint(0,1)
+    # French
+    if first_random == 0:    
+        random_idx = random.randint(0, 2046) # len de firstname_list
+        return firstname_list[random_idx]
+    # foreign    
+    else:
+        random_idx = random.randint(0, 36114) # len de firstname_list
+        return foreign_firstname_list[random_idx]
     
 # To delete after
 word_df.loc[word_df['is_target'] ==1, 'word'] = word_df['word'].apply(lambda x: get_random_firstname(x))
+
+
+word_df['is_stopword'] = word_df['word'].apply(lambda x: 1 if x.lower() in stopword_fr else 0)
+word_df['is_first_char_upper'] = word_df['word'].apply(lambda x: 1 if x[0].isupper() else 0)
+word_df['is_upper'] = word_df['word'].apply(lambda x: 1 if x.isupper() else 0)
+word_df['is_firstname'] = word_df['word'].apply(lambda x: 1 if x in firstname_list  else 0)
+
+# Checking if our random firstname is in french firstname to benchmark
+word_df['firstname_is_french'] = 0
+word_df.loc[(word_df['is_target'] ==1) & (word_df['word'].isin(firstname_list)), 'firstname_is_french'] = 1
+
 word_df.loc[word_df['is_target'] ==1, 'is_firstname'] = random.randint(0, 1)    #1 is To strong rule so random
 word_df['len_word'] = word_df['word'].apply(lambda x: len(x))  # len
+
+# Voir si i y a un Mr M Monsieurs avant...
+word_df['word_shift_1b'] = word_df.groupby(['doc_name'])['word'].apply(lambda x: x.shift(1))
+word_df['is_mister_word'] = 0
+word_df.loc[(word_df['is_target'] ==1) & (word_df['word_shift_1b'].isin(mister_list)), 'is_mister_word'] = 1
+
+
+# IF previous X.. X Z etc.. is a firstname then is target.
+word_df['is_firstname_1b'] = 0
+# For french firstname
+word_df.loc[(word_df['is_target'] ==1) & (word_df['word_shift_1b'].isin(firstname_list)), 'is_firstname_1b'] = 1
+# For foreigners firstname
+word_df.loc[(word_df['is_target'] ==1) & (word_df['word_shift_1b'].isin(foreign_firstname_list)), 'is_firstname_1b'] = 1
+word_df['is_firstname_1b_shift'] = word_df['is_firstname_1b'].shift(-1)
+word_df.loc[(word_df['is_firstname_1b_shift'] ==1), 'is_target'] = 1
+word_df = word_df.drop(['is_firstname_1b_shift', 'is_firstname_1b_shift'], axis=1)
+
+word_df = word_df.drop('word_shift_1b', axis=1)
+
+
 
 # Label encoding word
 lbl = LabelEncoder()
