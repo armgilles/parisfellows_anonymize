@@ -159,7 +159,7 @@ dtrain = xgb.DMatrix(X_train, y_train, missing=-1)
 dtest = xgb.DMatrix(X_test, y_test, missing=-1)
 evallist = [(dtrain, 'train'), (dtest, 'test')]
 
-params = {'max_depth':6,#12,
+params = {'max_depth':8,#12,
          'eta':0.1,#0.01,
 #         'subsample':0.85,#0.8,
 #         'colsample_bytree':0.95,#0.7,
@@ -198,6 +198,12 @@ X_valide['y_pred'] = y_pred_valide_b
 X_valide['y_pred_proba'] = y_pred_valide
 X_valide['error'] =0
 X_valide.loc[X_valide['is_target'] != X_valide['y_pred'], 'error'] = 1
+
+
+# False Positive selector
+fp = X_valide[(X_valide.error == 1) & (X_valide.is_target == 1)]
+# False Negative selector
+fn = X_valide[(X_valide.error == 1) & (X_valide.is_target == 0)]
 
 print "_"*54
 print "Some metrics : "
