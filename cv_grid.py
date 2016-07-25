@@ -79,8 +79,9 @@ skf = StratifiedKFold(y, n_folds=5, random_state=2016)
 #score = cross_val_score(clf, X, y, cv=skf, scoring='f1')
 
 params = {
-    'max_depth':[6, 8]
-#    'min_child_weight':range(1,6,2)
+    'max_depth':[6, 7, 8],
+    'min_child_weight': [0.8, 0.9, 0.95],
+    'subsample' : [0.8, 0.9, 0.95],
 }
 
 
@@ -89,3 +90,4 @@ gsearch1 = GridSearchCV(estimator = xgb.XGBClassifier(learning_rate =0.1, n_esti
                        param_grid = params, scoring='f1',n_jobs=4, cv=skf)
 gsearch1.fit(X,y)
 
+print display_grid_scores(gsearch1.grid_scores_)
