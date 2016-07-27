@@ -10,12 +10,13 @@ import nltk
 import random
 
 from nltk.corpus import stopwords
+from nltk.stem import SnowballStemmer
 from docx import Document
 from sklearn.preprocessing import LabelEncoder
 
 
 #target_list = ['X\xe2\x80\xa6', 'Y\xe2\x80\xa6', 'Z\xe2\x80\xa6', 'X']
-
+stemmer = SnowballStemmer("french")
 stopword_fr = [word for word in stopwords.words('french')]
 
 target_dict = {u'X\xe2\x80\xa6' : 'X', u'X' : 'X', u'X..' : 'X', u'X.' : 'X',
@@ -113,7 +114,7 @@ for idx , row in documents_df.T.iteritems():
         context_word.append({'doc_name' : row['doc_name'],
                              'paragraph_nb' : row['index']})
 
-# My bad of word
+# My bag of word
 word_df = pd.DataFrame(word_list, columns=['word'])
 
 # My context
@@ -201,6 +202,10 @@ def insert_row(x, idx):
 
 # Replace X.. Y by Radnom Name
 word_df.loc[word_df['is_target'] ==1, 'word'] = word_df['word'].apply(lambda x: get_random_name())
+word_df['admin_name'] = 0 # Admin stuff 
+word_df.loc[word_df['is_target'] ==1, 'admin_name'] = 1 # Admin stuff 
+
+
 # Check if word is Firstname then is_target :
 word_df['is_firstname'] = word_df['word'].apply(lambda x: 1 if x.title() in firstname_list else 0)
 word_df['word_shift_1b'] = word_df.groupby(['doc_name'])['word'].apply(lambda x: x.shift(1))
@@ -234,9 +239,11 @@ for idx, row in word_df[(word_df.is_target_1b == 1) & (word_df.is_firstname == 0
 
 #Delete old features
 word_df = word_df.drop(['is_firstname_1b', 'is_firstname_1b_shift', 'is_target_1b', 
-                        'word_shift_1b', 'is_name', 'is_firstname_1a', 'add_row'], axis=1)
+                        'word_shift_1b', 'is_name', 'is_firstname_1a'], axis=1)
 
 word_df = word_df[word_df.word != u'\u2026'] # To clean anonymasation from dataset and bad ML
+word_df = word_df[word_df.word != u"..."]
+word_df = word_df[word_df.word != u".."]
 word_df = word_df.reset_index(drop=True)
 
 
@@ -284,49 +291,73 @@ word_df['firstname_is_french'] = 0
 word_df.loc[(word_df['is_target'] ==1) & (word_df['word'].isin(firstname_list)), 'firstname_is_french'] = 1
 
 # Add some Random on is_firstname (0/1)
-word_df.loc[(word_df['is_target'] ==1) & (word_df.is_firstname == 1), 'is_firstname'] = random.randint(0, 1)    #1 is To strong rule so random
+word_df['admin_firstname'] = 0 # Admin stuff 
+word_df.loc[(word_df['is_target'] ==1) & (word_df.is_firstname == 1), 'admin_firstname'] = 1 # Admin stuff 
+# Random Firstname 2/3 chance to be Firstname
+word_df.loc[(word_df['is_target'] ==1) & (word_df.is_firstname == 1), 'is_firstname'] = 1 if random.randint(0, 1) >= 1 else 0 
+
+# Shift is_firstname
+word_df['is_firstname_1b'] = word_df.groupby(['doc_name'])['is_firstname'].apply(lambda x: x.shift(-1))
+word_df['is_firstname_2b'] = word_df.groupby(['doc_name'])['is_firstname'].apply(lambda x: x.shift(-2))
+
+word_df['is_firstname_1a'] = word_df.groupby(['doc_name'])['is_firstname'].apply(lambda x: x.shift(1))
+word_df['is_firstname_2a'] = word_df.groupby(['doc_name'])['is_firstname'].apply(lambda x: x.shift(2))
 
 #Check is there is a "Mr", "M" before...
-word_df['word_shift_1b'] = word_df.groupby(['doc_name'])['word'].apply(lambda x: x.shift(1))
 word_df['is_mister_word'] = 0
-word_df.loc[(word_df['is_target'] ==1) & (word_df['word_shift_1b'].isin(mister_list)), 'is_mister_word'] = 1
-word_df = word_df.drop('word_shift_1b', axis=1)
+word_df.loc[word_df['word'].isin(mister_list), 'is_mister_word'] = 1
 
-## IF previous X.. X Z etc.. is a firstname then is target.
-#word_df['is_firstname_1b'] = 0
-## For french firstname
-#word_df.loc[(word_df['is_target'] ==1) & (word_df['word_shift_1b'].isin(firstname_list)), 'is_firstname_1b'] = 1
-## For foreigners firstname
-#word_df.loc[(word_df['is_target'] ==1) & (word_df['word_shift_1b'].isin(foreign_firstname_list)), 'is_firstname_1b'] = 1
-#word_df['is_firstname_1b_shift'] = word_df['is_firstname_1b'].shift(-1)
-#word_df.loc[(word_df['is_firstname_1b_shift'] ==1), 'is_target'] = 1
-#word_df = word_df.drop(['is_firstname_1b_shift', 'is_firstname_1b_shift'], axis=1)
-
-
-## Label encoding word
+## Label encoding word stem
 lbl = LabelEncoder()
-word_df['word_encoded'] = lbl.fit_transform(list(word_df['word'].values))
 
+word_df['word_stem'] = word_df['word'].apply(lambda x: stemmer.stem(x))
+word_df['word_encoded'] = lbl.fit_transform(list(word_df['word_stem'].values))
+#drop stem word
+word_df = word_df.drop('word_stem', axis=1)
 
 # Shift words encoded
 ## One word before
-word_df['word_encoded_shift_1b'] = word_df.groupby(['doc_name'])['word_encoded'].apply(lambda x: x.shift(1))
+word_df['word_encoded_shift_1b'] = word_df.groupby(['doc_name'])['word_encoded'].apply(lambda x: x.shift(-1))
 
 ## Two words before
-word_df['word_encoded_shift_2b'] = word_df.groupby(['doc_name'])['word_encoded'].apply(lambda x: x.shift(2))
+word_df['word_encoded_shift_2b'] = word_df.groupby(['doc_name'])['word_encoded'].apply(lambda x: x.shift(-2))
 
 ## One word after
-word_df['word_encoded_shift_1a'] = word_df.groupby(['doc_name'])['word_encoded'].apply(lambda x: x.shift(-1))
+word_df['word_encoded_shift_1a'] = word_df.groupby(['doc_name'])['word_encoded'].apply(lambda x: x.shift(1))
 
 ## Two words after
-word_df['word_encoded_shift_2a'] = word_df.groupby(['doc_name'])['word_encoded'].apply(lambda x: x.shift(-2))
+word_df['word_encoded_shift_2a'] = word_df.groupby(['doc_name'])['word_encoded'].apply(lambda x: x.shift(2))
 
+# Shift is_mister_word Features
+## Beforef 
+word_df['is_mister_word_1b'] = word_df.groupby(['doc_name'])['is_mister_word'].apply(lambda x: x.shift(1))
+word_df['is_mister_word_2b'] = word_df.groupby(['doc_name'])['is_mister_word'].apply(lambda x: x.shift(2))
+## After
+word_df['is_mister_word_1a'] = word_df.groupby(['doc_name'])['is_mister_word'].apply(lambda x: x.shift(-1))
+word_df['is_mister_word_2a'] = word_df.groupby(['doc_name'])['is_mister_word'].apply(lambda x: x.shift(-2))
 
 # Fillna Nan word shift
 word_df = word_df.fillna(-1)
 
-#print " EXPORT..."
+
+print " EXPORT BAG OF WORD"
+## Export bag of word from LabelEncoding
+encoding_label = pd.DataFrame()
+encoding_label['words'] = lbl.classes_
+encoding_label['encoded'] = encoding_label.words.apply(lambda x: lbl.transform(unicode(x)))
+encoding_label.to_csv('data/encoding_label.csv', encoding=('utf-8'), index=False)
+
+
+# Admin features for benchmark
+####################################
+# admin_name : random name given for positive tag
+# add_row to know if we add the line
+# admin_firstname (if it is a firstanme in our base)
+
+
+print " EXPORT..."
 word_df.to_csv('data/data.csv', encoding='utf-8', index=False)
+
 
 
 # OLD
