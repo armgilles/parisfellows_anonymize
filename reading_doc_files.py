@@ -13,6 +13,8 @@ from nltk.corpus import stopwords
 from nltk.stem import SnowballStemmer
 from docx import Document
 from sklearn.preprocessing import LabelEncoder
+from textblob import TextBlob
+from textblob_fr import PatternTagger, PatternAnalyzer
 
 
 #target_list = ['X\xe2\x80\xa6', 'Y\xe2\x80\xa6', 'Z\xe2\x80\xa6', 'X']
@@ -175,10 +177,14 @@ def get_random_firstname():
 
 def get_random_name():
     """
-    Return a random name en CAPS
+    Return a random name (CAPS or tiltle)
     """
+    first_random = random.randint(0,1)
     random_idx = random.randint(0, 7999) # len de name_list
-    return name_list[random_idx]
+    if first_random == 0:
+        return name_list[random_idx]
+    else:
+        return name_list[random_idx].title() 
 
 def insert_row(x, idx):
     """
@@ -191,7 +197,7 @@ def insert_row(x, idx):
             'doc_name' :  x['doc_name'],
             'paragraph_nb' :  x['paragraph_nb'],
             'is_target' :  1,
-            'is_firstname' :  0,
+            'is_firstname' :  1,
             'word_shift_1b' :  '',
             'is_firstname_1b' :  '',
             'is_firstname_1b_shift' :  '',
@@ -208,6 +214,11 @@ word_df.loc[word_df['is_target'] ==1, 'admin_name'] = 1 # Admin stuff
 
 # Check if word is Firstname then is_target :
 word_df['is_firstname'] = word_df['word'].apply(lambda x: 1 if x.title() in firstname_list else 0)
+word_df['len_word'] = word_df['word'].apply(lambda x: len(x))
+#  We need to constrait word with forgein Firstanme list (to much false positive)
+word_df.loc[((word_df.len_word) > 3) & (word_df['word'].isin(foreign_firstname_list)), 'is_firstname' ] = 1
+word_df = word_df.drop('len_word', axis=1)
+
 word_df['word_shift_1b'] = word_df.groupby(['doc_name'])['word'].apply(lambda x: x.shift(1))
 word_df['is_firstname_1b'] = 0
 word_df.loc[(word_df['is_target'] == 1) & (word_df['word_shift_1b'].str.title().isin(firstname_list)), 'is_firstname_1b'] = 1
@@ -227,7 +238,7 @@ word_df['is_firstname_1a'] = word_df['is_firstname'].shift(-1)
 i = 0
 for idx, row in word_df[(word_df.is_target_1b == 1) & (word_df.is_firstname == 0)
                         & (word_df.is_firstname_1a == 0)].iterrows():
-    # Add some random (sometime Firstane sometime no...)
+    # Add some random (sometime Firstnane sometime no...)
     if random.randint(0, 1) == 1:
         print str(idx+i)
         # Si la row suivante est target et que ce n'est pas un Firstname
@@ -283,7 +294,6 @@ word_df = word_df.drop(['temp_count', 'end_comma', 'end_comma_cum',
 word_df['is_stopword'] = word_df['word'].apply(lambda x: 1 if x.lower() in stopword_fr else 0)
 word_df['is_first_char_upper'] = word_df['word'].apply(lambda x: 1 if x[0].isupper() else 0)
 word_df['is_upper'] = word_df['word'].apply(lambda x: 1 if x.isupper() else 0)
-word_df['is_firstname'] = word_df['word'].apply(lambda x: 1 if x in firstname_list else 0)
 word_df['len_word'] = word_df['word'].apply(lambda x: len(x))  # len
 
 # Checking if our random firstname is in french firstname to benchmark
@@ -336,6 +346,37 @@ word_df['is_mister_word_2b'] = word_df.groupby(['doc_name'])['is_mister_word'].a
 word_df['is_mister_word_1a'] = word_df.groupby(['doc_name'])['is_mister_word'].apply(lambda x: x.shift(-1))
 word_df['is_mister_word_2a'] = word_df.groupby(['doc_name'])['is_mister_word'].apply(lambda x: x.shift(-2))
 
+
+# Check type of word
+def type_extraction(x):
+    """
+    Return type of word
+    """
+    try:
+        blob = TextBlob(x, pos_tagger=PatternTagger(), analyzer=PatternAnalyzer())
+        return blob.tags[0][1]
+    except:
+         return 'PONCTUATION'
+
+
+word_df['word_type'] = word_df['word'].apply(lambda x: type_extraction(x))
+
+# Encode word type
+lbl_word_type = LabelEncoder()
+word_df['word_type'] = lbl_word_type.fit_transform(list(word_df['word_type'].values))
+print " EXPORT WORD TYPE"
+word_type_info = pd.DataFrame()
+word_type_info['word_type'] = lbl_word_type.classes_
+word_type_info['encoded'] = word_type_info.word_type.apply(lambda x: lbl_word_type.transform(unicode(x)))
+word_type_info.to_csv('data/word_type_info.csv', encoding=('utf-8'), index=False)
+
+# Shift Word type
+word_df['word_type_1b'] = word_df.groupby(['doc_name'])['word_type'].apply(lambda x: x.shift(1))
+word_df['word_type_2b'] = word_df.groupby(['doc_name'])['word_type'].apply(lambda x: x.shift(2))
+## After
+word_df['word_type_1a'] = word_df.groupby(['doc_name'])['word_type'].apply(lambda x: x.shift(-1))
+word_df['word_type_2a'] = word_df.groupby(['doc_name'])['word_type'].apply(lambda x: x.shift(-2))
+
 # Fillna Nan word shift
 word_df = word_df.fillna(-1)
 
@@ -359,7 +400,7 @@ print " EXPORT..."
 word_df.to_csv('data/data.csv', encoding='utf-8', index=False)
 
 
-
+#
 # OLD
 #docText = '\n\n'.join([
 #    paragraph.text.encode('utf-8') for paragraph in paragraphs
